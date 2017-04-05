@@ -55,16 +55,21 @@ module.exports = (robot) ->
   robot.brain.data.orders = robot.brain.data.orders || {}
 
   # Explain how to use the lunch bot
-  MESSAGE = """
-  @channel Let's order lunch! You can say:
-
+  COMMANDS = """
   `i want to eat <order>` - adds food `<order>` to the lunch order
   `i want to drink <order>` - adds drinks `<order>` to the lunch order
   `remove my order` - removes your order
   `orders` - lists all orders per person
+  `show order` - lists all orders per product
   `cancel orders` - cancels all orders
   `who should pickup lunch?` - randomly selects person to pickup lunch
   `help` - displays this help message
+  """
+
+  MESSAGE = """
+  @channel Let's order lunch! You can say:
+
+  #{COMMANDS}
 
   Menu: http://feelgoodgroningen.nl/menukaart/
   """
@@ -143,7 +148,7 @@ module.exports = (robot) ->
 
   ##
   # List out amount of each item
-  robot.respond /foodorder/i, (msg) ->
+  robot.respond /show order/i, (msg) ->
     orders = order.get().map (item) -> "#{item}: #{robot.brain.data.orders[item].unique().length}"
     msg.send orders.join("\n") || "No items in the lunch list."
 
@@ -192,7 +197,7 @@ module.exports = (robot) ->
   ##
   # Display usage details
   robot.respond /help/i, (msg) ->
-    msg.send MESSAGE
+    msg.send COMMANDS
 
   robot.respond /notify/i, (msg) ->
     lunch.notify()
