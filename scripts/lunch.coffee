@@ -155,7 +155,7 @@ module.exports = (robot) ->
   robot.respond /help/i, (msg) ->
     msg.send MESSAGE
 
-  robot.respnd /notify/i, (msg) ->
+  robot.respond /notify/i, (msg) ->
     lunch.notify()
 
   ##
