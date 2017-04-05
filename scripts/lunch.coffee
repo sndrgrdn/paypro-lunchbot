@@ -2,29 +2,24 @@
 #   Help keep track of whats being ordered for lunch
 #
 # Dependencies:
-#    "cron": "",
-#    "time": ""
+#   None
 #
 # Configuration:
-#   HUBOT_LUNCHBOT_ROOM
-#   HUBOT_LUNCHBOT_NOTIFY_AT
-#   HUBOT_LUNCHBOT_CLEAR_AT
-#   TZ # eg. "America/Los_Angeles"
-#   HUBOT_LUNCHBOT_LUNCHDAY
+#   None
 #
-# Commands:
-#   `i want <order>` - adds `<order>` to the lunch order
-#   `remove my order` - removes your order
-#   `orders` - lists all orders
-#   `cancel orders` - cancels all orders
-#   `who should pickup lunch?` - randomly selects person to pickup lunch
-#   `help` - displays this help message
 # Notes:
 #   nom nom nom
 #
 # Author:
-#   @jpsilvashy
+#   @sndrgrdn
 #
+
+##
+# Monkeypatch unique
+Array::unique = ->
+  output = {}
+  output[@[key]] = @[key] for key in [0...@length]
+  value for key, value of output
 
 ##
 # What room do you want to post the lunch messages in?
@@ -57,17 +52,21 @@ module.exports = (robot) ->
 
   # Make sure the lunch dictionary exists
   robot.brain.data.lunch = robot.brain.data.lunch || {}
+  robot.brain.data.orders = robot.brain.data.orders || {}
 
   # Explain how to use the lunch bot
   MESSAGE = """
-  @channel: Let's order lunch! You can say:
+  @channel Let's order lunch! You can say:
 
-  `i want <order>` - adds `<order>` to the lunch order
+  `i want to eat <order>` - adds food `<order>` to the lunch order
+  `i want to drink <order>` - adds drinks `<order>` to the lunch order
   `remove my order` - removes your order
-  `orders` - lists all orders
+  `orders` - lists all orders per person
   `cancel orders` - cancels all orders
   `who should pickup lunch?` - randomly selects person to pickup lunch
   `help` - displays this help message
+
+  Menu: http://feelgoodgroningen.nl/menukaart/
   """
 
   ##
@@ -76,18 +75,38 @@ module.exports = (robot) ->
     get: ->
       Object.keys(robot.brain.data.lunch)
 
-    add: (user, item) ->
-      robot.brain.data.lunch[user] = item
+    addFood: (user, item, type) ->
+      robot.brain.data.lunch[user] = robot.brain.data.lunch[user] || {}
+      robot.brain.data.lunch[user].food = item
+      order.add item, user
+
+    addDrink: (user, item, type) ->
+      robot.brain.data.lunch[user] = robot.brain.data.lunch[user] || {}
+      robot.brain.data.lunch[user].drink = item
+      order.add item, user
 
     remove: (user) ->
       delete robot.brain.data.lunch[user]
 
     clear: ->
       robot.brain.data.lunch = {}
-      robot.messageRoom ROOM, "lunch orders cleared..."
 
     notify: ->
       robot.messageRoom ROOM, MESSAGE
+
+  ##
+  # Define the order functions
+  order =
+    get: ->
+      Object.keys(robot.brain.data.orders)
+
+    add: (item, user) ->
+      orders = robot.brain.data.orders
+      orders[item] = orders[item] || []
+      orders[item].push user
+
+    clear: ->
+      delete robot.brain.data.orders = {}
 
   ##
   # Define things to be scheduled
@@ -100,7 +119,8 @@ module.exports = (robot) ->
 
     clear: (time) ->
       new CronJob(time, ->
-        robot.brain.data.lunch = {}
+        lunch.clear()
+        order.clear()
         return
       , null, true, TIMEZONE)
 
@@ -114,16 +134,33 @@ module.exports = (robot) ->
 
   ##
   # List out all the orders
-  robot.respond /orders$/i, (msg) ->
-    orders = lunch.get().map (user) -> "#{user}: #{robot.brain.data.lunch[user]}"
+  robot.respond /orders/i, (msg) ->
+    orders = lunch.get().map (user) ->
+      food = robot.brain.data.lunch[user].food
+      drink = robot.brain.data.lunch[user].drink
+      "#{user}: #{food || ''}, #{drink || ''}"
+    msg.send orders.join("\n") || "No items in the lunch list."
+
+  ##
+  # List out amount of each item
+  robot.respond /foodorder/i, (msg) ->
+    orders = order.get().map (item) -> "#{item}: #{robot.brain.data.orders[item].unique().length}"
     msg.send orders.join("\n") || "No items in the lunch list."
 
   ##
   # Save what a person wants to the lunch order
-  robot.respond /i want (.*)/i, (msg) ->
+  robot.respond /i want to eat (.*)/i, (msg) ->
     item = msg.match[1].trim()
     username = msg.message.user.name
-    lunch.add username, item
+    lunch.addFood username, item
+    msg.send "OK #{username}, added #{item} to the order."
+
+  ##
+  # Save what a person wants to the lunch order
+  robot.respond /i want to drink (.*)/i, (msg) ->
+    item = msg.match[1].trim()
+    username = msg.message.user.name
+    lunch.addDrink username, item
     msg.send "OK #{username}, added #{item} to your order."
 
   ##
@@ -138,6 +175,8 @@ module.exports = (robot) ->
   robot.respond /cancel orders/i, (msg) ->
     delete robot.brain.data.lunch
     lunch.clear()
+    order.clear()
+    robot.messageRoom ROOM, "lunch orders cleared..."
 
   ##
   # Help decided who should pickup
@@ -146,7 +185,7 @@ module.exports = (robot) ->
     key = Math.floor(Math.random() * orders.length)
 
     if orders[key]?
-      msg.send "@#{orders[key]} looks like you have to pickup lunch today! 222"
+      msg.send "@#{orders[key]} looks like you have to pickup lunch today!"
     else
       msg.send "Hmm... Looks like no one has ordered any lunch yet today."
 
