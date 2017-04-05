@@ -60,7 +60,7 @@ module.exports = (robot) ->
 
   # Explain how to use the lunch bot
   MESSAGE = """
-  Let's order lunch for *#{LUNCHDAY}*! You can say:
+  @channel: Let's order lunch! You can say:
 
   `i want <order>` - adds `<order>` to the lunch order
   `remove my order` - removes your order
@@ -154,6 +154,9 @@ module.exports = (robot) ->
   # Display usage details
   robot.respond /help/i, (msg) ->
     msg.send MESSAGE
+
+  robot.respnd /notify/i, (msg) ->
+    lunch.notify()
 
   ##
   # Just print out the details on how the lunch bot is configured
